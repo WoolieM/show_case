@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  web:
+    image: my-first-fast-image:v0.1
+    container_name: my-first-contianer-fast-apppppp
+    build:
+      context: .
+    ports:
+    - "8000:8000"
+    volumes:
+      - ./src/:/app/src  # Mount the application code
+    environment:
+      - UVICORN_RELOAD=1 # Enable auto-reloading
