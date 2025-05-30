@@ -1,8 +1,9 @@
-# trigger:
-#   branches:
-#     include:
-#       - feature/**
-#       - main
+trigger:
+  branches:
+    include:
+      - feature/**
+      - main
+      - uat
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -10,9 +11,57 @@ pool:
 variables:
   pythonVersion: '3.13'
 
+pr:
+  branches:
+    include:
+      - main
+      - uat
 
 jobs:
+  - job: HelloWorld
+    displayName: 'Hello World Job'
+    steps:
+      - script: echo "Hello, World!"
+        displayName: 'Check Pipeline Trigger'
+      - script: |
+          echo "Source Branch: $(Build.SourceBranch)"
+        displayName: 'Display Source Branch'
+
+  - job: ValidateSourceBranch
+    displayName: 'Validate Source Branch'
+    dependsOn: HelloWorld
+    condition: and(succeeded('HelloWorld'), eq(variables['Build.Reason'], 'PullRequest'))
+    steps:
+      - script: |
+          echo 'Checking source branch'
+          echo "Source branch: $SOURCE_BRANCH"
+          echo "Target branch: $TARGET_BRANCH"
+          
+          SOURCE=$(echo $SOURCE_BRANCH | sed 's|refs/heads/||')
+          TARGET=$(echo $TARGET_BRANCH | sed 's|refs/heads/||')
+
+          if [ "$TARGET" = "main" ] && [ "$SOURCE" != "uat" ]; then
+            echo "❌ Source branch must be UAT when target branch is main."
+            exit 1
+          else
+            echo "✅ Source branch and Target branch are valid."
+          fi
+        displayName: 'Check Source Branch Validity'
+        env:
+          SOURCE_BRANCH: $(System.PullRequest.SourceBranch)
+          TARGET_BRANCH: $(System.PullRequest.TargetBranch)
+
+
   - job: Build
+    dependsOn: ValidateSourceBranch
+    condition: |
+          or(
+            and(
+              eq(variables['Build.Reason'], 'PullRequest'),
+              succeeded('ValidateSourceBranch')
+            ),
+            ne(variables['Build.Reason'], 'PullRequest')
+          )
     steps:
       - task: UsePythonVersion@0
         inputs:
